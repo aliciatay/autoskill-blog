@@ -58,7 +58,6 @@
         <li><a href="#eval">Evaluation</a></li>
         <li><a href="#deploy">Deployment</a></li>
         <li><a href="#limits">Limitations</a></li>
-        <li><a href="#close">Learnings</a></li>
       </ol>
     </aside>
 
@@ -219,9 +218,7 @@
           </li>
           <li>
             <strong>Storage is file-based, not a database.</strong> Skills, session state, and
-            generated files all live on disk under the backend's working directory. This was a
-            deliberate scope choice and the first thing we would change if we productionised
-            this.
+            generated files all live on disk under the backend's working directory.
           </li>
         </ol>
       </section>
@@ -359,36 +356,13 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
 "description": ...} or {"detected": false}.</code></pre>
         </div>
 
-        <h3>The "did the agent already use a skill?" branch</h3>
-        <p>
-          A separate AI-fallback check reads a <code>[System Alert]</code> annotation we
-          inject into the transcript whenever the assistant invoked an existing skill. If
-          the model used an existing skill <em>and succeeded</em>, the turn is not a
-          candidate — we do not want to shadow-duplicate a perfect execution. If it used an
-          existing skill but had to drop into custom code to finish, it <em>is</em> a
-          candidate: the existing skill needs to evolve. This branch is what later wires
-          into <a href="#beyond">skill evolution</a> rather than creating a duplicate.
-        </p>
-
         <h3>Full buffer, not a rolling window</h3>
         <p>
-          The proposal originally used a rolling window of the last N messages. We switched
-          to the full 40-message buffer for two reasons.
+          The proposal originally used a rolling window of the last N messages. We decided on
+          a 40-message buffer so that skill-worthy workflows — which often straddle a
+          clarification exchange (the user asks, the model asks back, the user answers, the
+          model does the work) — aren't cut short before the parameterisable inputs appear.
         </p>
-        <p>
-          First, skill-worthy workflows often straddle a clarification exchange — the user
-          asks, the model asks back, the user answers, the model does the work. A window
-          narrow enough to evaluate cheaply might cut the setup off and miss the
-          parameterisable inputs. Second, triggering on the same buffer the user can see in
-          the UI makes the system's behaviour predictable: when a candidate appears, it is
-          always explainable by what is visible above it.
-        </p>
-
-        <h3>Live example</h3>
-        <figure>
-          <div id="chat-mount"></div>
-          <figcaption><b>Figure 4</b> A representative session. The Observer only fires once the final assistant turn confirms the workflow completed successfully; the candidate card is surfaced after the stream's <code>done</code> event so users never wait for it.</figcaption>
-        </figure>
 
         <h3>Robustness</h3>
         <p>Three details made the trigger production-feasible:</p>
@@ -408,7 +382,7 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
       <section id="architect">
         <h2>Architect — from candidate to validated skill</h2>
         <p>
-          When a candidate survives the trigger and the user clicks "Review Skill," the
+          If the trigger flags a candidate and the user clicks "Review Skill," the
           Architect runs.
         </p>
 
@@ -419,7 +393,7 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
           <div class="demo-cap"><span class="demo-num">Demo 2</span> Architect detects a workflow and drafts a skill</div>
           <ul class="demo-bullets">
             <li>Architect automatically detects repeatable workflows from the chat buffer.</li>
-            <li>Converts the workflow into a structured <code>SKILL.md</code> definition with parameters.</li>
+            <li>Converts the workflow into a structured SKILL.md definition with parameters.</li>
             <li>User-in-the-loop: the review modal opens for inspection and edit before save.</li>
           </ul>
         </figure>
@@ -582,24 +556,12 @@ casing causes runtime KeyError / column-not-found failures.
 
         <h3>Steering with use-case hints from the conversation</h3>
         <p>
-          The validated manifest is not shipped directly to disk — it surfaces in a review
-          modal where the user can nudge it before it becomes a skill. The obvious version
-          of that modal is an empty text box captioned "any extra instructions?" and a Save
-          button; in practice users stared at the empty box and could not tell what kind of
-          nudge was useful.
-        </p>
-
-        <p>
-          <code>SkillReviewModal.tsx</code> extracts field hints from the conversation
-          itself and uses them to build a context-aware placeholder. The candidate skill
-          carries a <code>conversation_context</code> payload — the same buffer slice that
-          triggered the Architect — and a small client-side pass
-          (<code>extractFieldHints</code>, then <code>buildPlaceholder</code>) pulls out the
-          concrete use-case details the user mentioned: column names, filter values, file
-          shapes, thresholds. Those details are assembled into a placeholder like "e.g.,
-          filter <em>status = active</em>, sort by <em>created_at</em> descending" so the
-          empty box becomes a prompt that suggests to the user what sort of refinements they
-          can explore.
+          After validation, the skill surfaces in a review modal with an optional "any extra
+          instructions?" box. To show the user what kind of refinement is useful, we pull
+          concrete details from the conversation (column names, filter values, thresholds)
+          and use them to build a context-aware placeholder — e.g., "filter
+          <em>status = active</em>, sort by <em>created_at</em> descending" — so the empty
+          box becomes a prompt that suggests how they can refine the skill.
         </p>
 
         <h3>Skill evolution</h3>
@@ -633,9 +595,9 @@ casing causes runtime KeyError / column-not-found failures.
       <section id="integrator">
         <h2>Integrator — saving, mounting, versioning</h2>
         <p>
-          The Integrator is the persistence layer. It has the fewest moving parts and that
-          is the point — everything uncertain has already happened by the time a user clicks
-          save.
+          The Integrator is the persistence layer. By the time the user clicks save,
+          generation and validation have already happened — the Integrator's job is to write
+          the approved skill to disk and mount it into future sessions.
         </p>
 
         <h3>On-disk layout</h3>
@@ -689,6 +651,11 @@ casing causes runtime KeyError / column-not-found failures.
         shutil.rmtree(mounted_dir / slug)</code></pre>
         </div>
 
+        <p>
+          From the user's perspective, none of this plumbing is visible — they just open a
+          new chat and use the skill.
+        </p>
+
         <figure class="demo">
           <div class="demo-frame">
             <img src="demos/03-reuse.gif" alt="A new chat session: the user uploads employees.csv and asks the agent to filter and sort it. A green FILTER-AND-SORT-CSV chip appears under the assistant message and the resulting table renders inline."/>
@@ -706,8 +673,7 @@ casing causes runtime KeyError / column-not-found failures.
       <section id="sandbox">
         <h2>The Docker sandbox</h2>
         <p>
-          Everything the agent executes runs inside a per-session Docker container. This is
-          where the largest share of our engineering time went.
+          Everything the agent executes runs inside a per-session Docker container.
         </p>
 
         <h3>One container per session, long-lived</h3>
@@ -726,7 +692,7 @@ casing causes runtime KeyError / column-not-found failures.
 
         <p>
           The agent can write to its working directory freely — that is how it produces
-          artifacts — but it cannot modify the skills themselves.
+          artifacts.
         </p>
 
         <h3>Per-user images</h3>
@@ -734,8 +700,10 @@ casing causes runtime KeyError / column-not-found failures.
           Skills can declare a <code>requirements.txt</code>. When a user's library
           changes, we aggregate all <code>requirements.txt</code> files into a master list and
           build a personalised image layered on top of <code>autoskill-sandbox</code> in the
-          background. A user's first session after adding a new skill may fall through to the
-          base image; every subsequent session starts with <code>pip</code> already done.
+          background. If the user opens a chat before the build finishes, that first session
+          falls back to the base image and installs dependencies on startup; once the
+          personalised image is ready, every subsequent session starts with
+          <code>pip install</code> already done.
         </p>
 
         <h3>Validation sandboxes are separate</h3>
@@ -746,17 +714,15 @@ casing causes runtime KeyError / column-not-found failures.
           the user hasn't approved yet should not influence the session's live workspace.
         </p>
 
-        <h3>Why Docker at all</h3>
+        <h3>Read-only skill mount</h3>
         <p>
-          We could have sandboxed using Python <code>subprocess</code> + <code>seccomp</code>,
-          or <code>firejail</code>, or a WebAssembly runtime. We chose Docker for three
-          reasons:
+          The <code>.gemini/skills</code> directory is mounted <code>:ro</code> into the
+          session container. The agent can <em>use</em> skills but not edit them: any
+          change has to go back through the review modal, which re-runs the full validation
+          ladder. Trust boundaries belong at the layer that produces new code, not the layer
+          that runs it — if the agent could rewrite its own skills at runtime, the
+          Architect's validation would be cosmetic.
         </p>
-        <ul>
-          <li><strong>Parity.</strong> Validation and the live agent run in the <em>same</em> image.</li>
-          <li><strong>Dependency handling.</strong> <code>requirements.txt</code> + <code>pip install</code> inside a container is boring and well-understood.</li>
-          <li><strong>Honesty about scope.</strong> We are a student project; we use the sandbox that has battle-tested isolation for arbitrary Python code.</li>
-        </ul>
       </section>
 
       <!-- Beyond -->
@@ -931,114 +897,36 @@ casing causes runtime KeyError / column-not-found failures.
 
         <h3>File-based persistence</h3>
         <p>
-          Skills and workers persist to disk under <code>backend/users/&lt;user_id&gt;/</code>
-          and survive across sessions, restarts, and redeploys — the durable state that
-          makes the product useful. The session buffer and usage counts live in process
-          memory and are lost on restart. The file-based store was a deliberate scope
-          choice: zero infra, fast iteration, and sufficient for a multi-user course
-          project. It caps real-world scale at one backend process, which is where a
-          production deployment would swap in Postgres for skill metadata and Redis for
-          the buffer. For the proof-of-concept, the tradeoff was correct.
+          Skills and workers persist to disk under
+          <code>backend/users/&lt;user_id&gt;/</code> and survive sessions, restarts, and
+          redeploys. The session buffer and usage counts live in process memory and are
+          lost on restart. The file-based store was a deliberate scope choice for the
+          proof-of-concept — zero infra, fast iteration — but it caps real-world scale at
+          one backend process. A production deployment would swap in Postgres for skill
+          metadata and Redis for the buffer.
         </p>
 
         <h3>Cross-session workflows</h3>
         <p>
           The Observer only sees the current session's buffer, so a workflow that spans two
           sessions ("yesterday you wrote this script; today, update it") does not trigger
-          as a single unit. This is a harder product problem than a technical one: the
-          user already knows there's a skill to codify; asking them to re-demonstrate it in
-          one sitting is arguably a feature, not a bug, because it forces the workflow to
-          be stably reproducible before it's saved. A cross-session trigger would also
-          need to disambiguate "continuing yesterday's work" from "starting something new
-          that resembles yesterday's work."
-        </p>
-
-        <h3>Validation sandbox network access</h3>
-        <p>
-          When a candidate skill is validated, each script is dry-run inside a fresh,
-          ephemeral Docker container with the session's uploads mounted read-only and a
-          60-second wall-clock timeout. That container currently runs with default
-          networking rather than <code>--network none</code>. We tried the stricter
-          lockdown first, but it silently broke any skill that legitimately needed DNS
-          during a dry-run — anything calling an external API, fetching a URL, or
-          resolving a package mirror. Empty-stderr soft-passes masked those failures as
-          warnings the user could not action. The current posture — ephemeral container,
-          read-only mount, short timeout, network open — is the pragmatic middle ground:
-          the blast radius is still bounded by the ephemeral container and short timeout,
-          and the validator correctly exercises skills that call out to real services. A
-          narrower egress proxy (DNS plus a per-skill allowlist derived from the script's
-          imports) would be the natural next step.
+          as a single unit. Arguably a feature rather than a bug, because it forces the
+          workflow to be stably reproducible in one sitting before it is saved. A
+          cross-session trigger would also need to disambiguate "continuing yesterday's
+          work" from "starting something new that resembles yesterday's work."
         </p>
 
         <h3>Session-scoped generated files</h3>
         <p>
-          Any file the agent generates lands in the Files sidebar on the right — preview,
-          download, delete — and is tied to the active session. When the session ends (or
-          the zombie cleaner reaps an idle session), <code>cleanup_session()</code> wipes
-          the agent workspace and the generated files with it. Skills and workers are
-          unaffected; only the session artifacts go. This is the right default for two
-          reasons: first, most generated files are ephemeral by nature (a filtered CSV, a
-          one-off summary PDF) and accumulating them across sessions would turn the
-          sidebar into a junk drawer; second, storage grows linearly with session count,
-          and making generated files durable without an explicit opt-in would be a silent
-          cost commitment on the user. The friction point is real though — users
-          occasionally produce a file they didn't realise they wanted to keep until after
-          the session closed. A per-file "keep this" toggle that promotes a generated
-          file into the durable library alongside skills would be the natural next step.
+          Files the agent generates are tied to the active session — when the session ends,
+          <code>cleanup_session()</code> wipes the workspace and the generated files with
+          it. Skills and workers are unaffected; only session artifacts go. Most generated
+          files are ephemeral by nature (a filtered CSV, a one-off summary PDF), so this is
+          the right default; the friction point is users occasionally producing a file they
+          didn't realise they wanted to keep until after the session closed. A per-file
+          "keep this" toggle that promotes a generated file into the durable library would
+          be the natural next step.
         </p>
-      </section>
-
-      <!-- Learnings -->
-      <section id="close">
-        <h2>Learnings</h2>
-        <p>
-          A handful of decisions mattered more than the rest. For each, the obvious first
-          answer would have broken something a user would eventually hit. These are the
-          places where choosing the less obvious path earned its keep — and the principle
-          we took away from each one.
-        </p>
-
-        <div class="close-call">
-          <span class="cc-label">Learning · 01</span>
-          <h4>Preserving exact column casing in generated scripts</h4>
-          <div class="cc-body"><span class="cc-label danger">obvious first answer</span> Let the model generate scripts using natural-sounding column names like <code>row["Department"]</code>.</div>
-          <div class="cc-body"><span class="cc-label">what that cost</span> User-supplied CSVs often have headers like <code>department</code> (lowercase). The script validates (syntax OK, <code>pandas</code> imports) but explodes on first real use.</div>
-          <div class="cc-body"><span class="cc-label good">what we chose</span> Explicit "preserve EXACT spelling, casing, and whitespace" instruction in <code>expand.md</code>, reinforced by treating attached-file content as canonical.</div>
-        </div>
-
-        <div class="close-call">
-          <span class="cc-label">Learning · 02</span>
-          <h4>Argparse unrecognised-args retry</h4>
-          <div class="cc-body"><span class="cc-label danger">obvious first answer</span> Declare sandbox validation failed on the first non-zero exit.</div>
-          <div class="cc-body"><span class="cc-label">what that cost</span> Gemini sometimes hallucinates an <code>--output</code> flag on scripts that print to stdout. The script is fine; the caller is wrong. Rejecting the skill would be unfair.</div>
-          <div class="cc-body"><span class="cc-label good">what we chose</span> On <code>exit 2</code> + <code>unrecognized arguments</code>, strip the offending flags and retry once. If the retry passes, log a warning but accept.</div>
-        </div>
-
-        <div class="close-call">
-          <span class="cc-label">Learning · 03</span>
-          <h4>Snapshot-before-overwrite on every mutation</h4>
-          <div class="cc-body"><span class="cc-label danger">obvious first answer</span> Write the new <code>SKILL.md</code> and scripts directly, treating each update as idempotent.</div>
-          <div class="cc-body"><span class="cc-label">what that cost</span> Evolution is the feature users will most want to experiment and iterate on — and sometimes regret instantly. A natural-language refinement could destroy a working skill with no recovery path.</div>
-          <div class="cc-body"><span class="cc-label good">what we chose</span> Every update path snapshots the existing version under <code>versions/</code> before overwriting. Extra disk is immaterial; freedom to iterate without fear is not.</div>
-        </div>
-
-        <div class="close-call">
-          <span class="cc-label">Learning · 04</span>
-          <h4>The validation ladder has to sit upstream of the agent</h4>
-          <div class="cc-body"><span class="cc-label danger">obvious first answer</span> Mount the skills directory read-write so the agent could, in theory, self-modify its skills mid-conversation.</div>
-          <div class="cc-body"><span class="cc-label">what that cost</span> The whole Architect pipeline — duplicate check, sandbox dry-run, human review modal — is what makes a skill trustworthy. An agent with write access can bypass all of it in a single turn. A prompt injection, a hallucination, or a well-meaning "let me fix that for you" could rewrite a working skill to nonsense with no signal to the user.</div>
-          <div class="cc-body"><span class="cc-label good">what we chose</span> <code>.gemini/skills</code> is mounted <code>:ro</code> into the session container. Changes only land through the review modal, which re-runs the ladder. The agent can <em>use</em> skills but not <em>edit</em> them.</div>
-          <div class="cc-body"><span class="cc-label">the principle</span> Trust boundaries belong at the layer that produces new code, not the layer that runs it. If the agent can edit its own skills at runtime, the validation ladder is cosmetic. Make the mount read-only first; add affordances on top second.</div>
-        </div>
-
-        <div class="close-call">
-          <span class="cc-label">Learning · 05</span>
-          <h4>Counting skill usage by successful outcome, not attempt</h4>
-          <div class="cc-body"><span class="cc-label danger">obvious first answer</span> Increment a skill's usage counter every time the agent invokes it.</div>
-          <div class="cc-body"><span class="cc-label">what that cost</span> Usage counts feed the "most used" surfaces — recent-skills lists, worker-suggestion ranking, and the skills the Architect treats as high-signal when deciding whether a new candidate is a duplicate. Counting failed invocations pollutes all of it: a broken skill that users keep retrying (because the agent keeps picking it up) would rank <em>above</em> a working skill used once correctly. The signal would actively mislead the parts of the system that depend on it.</div>
-          <div class="cc-body"><span class="cc-label good">what we chose</span> The tool-result handler in <code>gemini.py</code> checks the tool's stdout for error signatures — <code>Traceback (most recent call last)</code>, <code>No such file or directory</code>, <code>Permission denied</code>, <code>command not found</code>, <code>Error:</code> — and only credits the pending skill when none are present. Broken skills stay at zero use until they're fixed.</div>
-          <div class="cc-body"><span class="cc-label">the principle</span> Every metric a system surfaces to users (or feeds back into its own decisions) needs to reflect the thing that metric claims to measure. "Most used" has to mean most successfully used; otherwise it's "most confused about."</div>
-        </div>
       </section>
 
       <div class="end-rule">· · ·</div>
