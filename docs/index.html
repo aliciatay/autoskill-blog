@@ -412,6 +412,18 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
           Architect runs.
         </p>
 
+        <figure class="demo">
+          <div class="demo-frame">
+            <img src="demos/02-architect.gif" alt="The 'Edit Skill Details' review modal opens over the chat. Skill name and description are pre-filled — filter_and_sort_csv — and a Generating spinner indicates the second-pass expand call is in flight."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 2</span> Architect detects a workflow and drafts a skill</div>
+          <ul class="demo-bullets">
+            <li>Architect automatically detects repeatable workflows from the chat buffer.</li>
+            <li>Converts the workflow into a structured <code>SKILL.md</code> definition with parameters.</li>
+            <li>User-in-the-loop: the review modal opens for inspection and edit before save.</li>
+          </ul>
+        </figure>
+
         <h3>Two-step generation</h3>
 
         <dl class="def">
@@ -525,18 +537,6 @@ casing causes runtime KeyError / column-not-found failures.
         <figure>
           <div id="stepper-mount"></div>
           <figcaption><b>Figure 5</b> Validation ladder. Layer 1 is syntactic and synchronous — fast. Layer 2 is a fresh Docker dry-run per script with example parameters and the session's uploads mounted read-only.</figcaption>
-        </figure>
-
-        <figure class="demo">
-          <div class="demo-frame">
-            <img src="demos/02-architect.gif" alt="The 'Edit Skill Details' review modal opens over the chat. Skill name and description are pre-filled — filter_and_sort_csv — and a Generating spinner indicates the second-pass expand call is in flight."/>
-          </div>
-          <div class="demo-cap"><span class="demo-num">Demo 2</span> Architect detects a workflow and drafts a skill</div>
-          <ul class="demo-bullets">
-            <li>Architect automatically detects repeatable workflows from the chat buffer.</li>
-            <li>Converts the workflow into a structured <code>SKILL.md</code> definition with parameters.</li>
-            <li>User-in-the-loop: the review modal opens for inspection and edit before save.</li>
-          </ul>
         </figure>
 
         <p>Two softenings in Layer 2 matter more than they look.</p>
