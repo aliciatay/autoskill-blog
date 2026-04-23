@@ -122,7 +122,7 @@
             <li>Works like any chat agent on the surface; the observation layer is invisible.</li>
             <li>Every turn is silently inspected for repeatable workflow patterns.</li>
           </ul>
-          <figcaption><b>Figure 2</b> The user-facing surface. AutoSkill looks like an ordinary chat client; the entire skill-synthesis pipeline runs off-thread and only interrupts when there is a skill worth reviewing.</figcaption>
+          <figcaption><b>Figure 2</b> The user-facing surface. AutoSkill looks like an ordinary chat client; the entire skill-synthesis pipeline runs off-thread and only politely flags when there is a skill worth reviewing.</figcaption>
         </figure>
       </section>
 
@@ -232,17 +232,17 @@
 
         <h3>The buffer</h3>
         <p>
-          Every message — user or model — is appended to an in-memory <code>deque</code>
-          capped at 40 entries per session. We picked 40 because skill-worthy workflows are
-          usually 6–12 turns long, and we wanted headroom for a trigger to still catch a
-          workflow when the user drifts into unrelated follow-ups before deciding to save. The
+          Every message is appended to an in-memory <code>deque</code>
+          capped at 40 entries per session. We picked 40 because we wanted sufficient headroom
+          for a trigger to still catch a workflow when the user drifts into unrelated
+          follow-ups before deciding to save. The
           buffer is per-session, lives in a process-local dict, and is wiped on "New Chat" or
           after 2 minutes without a frontend heartbeat.
         </p>
 
         <h3>The trigger</h3>
         <p>
-          After the assistant's reply finishes streaming, a lightweight Gemini Flash Lite call
+          After the assistant's reply finishes streaming, a lightweight Gemini Flash call
           — the <strong>trigger evaluator</strong> — reads the full buffer. The prompt frames
           the decision around one question:
         </p>
@@ -309,7 +309,7 @@
         </ul>
 
         <p>
-          The full prompt is below. It is what the Flash Lite call receives after every
+          The full prompt is below. It is what the Gemini call receives after every
           assistant turn, with the rolling 40-message buffer appended as context.
         </p>
 
@@ -409,18 +409,10 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
         <h2>Architect — from candidate to validated skill</h2>
         <p>
           When a candidate survives the trigger and the user clicks "Review Skill," the
-          Architect runs. It is the most code-heavy part of the system and the one where
-          failures would be most visible, so we invested the most in graceful degradation.
+          Architect runs.
         </p>
 
         <h3>Two-step generation</h3>
-        <p>
-          The obvious approach is one big prompt: "here is the conversation, give me a full
-          <code>SKILL.md</code> with scripts and parameters." We tried it; it produced
-          good-looking skills that were subtly wrong — inventing parameters that weren't
-          really variable, or baking in values that should have been parameters. We split the
-          call in two.
-        </p>
 
         <dl class="def">
           <dt>step 1</dt>
@@ -430,7 +422,7 @@ Respond ONLY with valid JSON: {"detected": true, "name": ...,
         </dl>
 
         <p>
-          The split is not free — it is two API calls per skill — but it produces skills whose
+          This means that it is two API calls per skill — but it produces skills whose
           parameter schema and content are coherent with each other, because Step 2 is
           <em>anchored</em> on Step 1's output rather than inventing both in the same pass.
         </p>
@@ -478,12 +470,12 @@ For each parameter:
 
         <h3>The "preserve exact casing" rule</h3>
         <p>
-          One subtle failure mode nearly bit us. Generated skills would read a user-supplied
-          CSV whose header was <code>department</code> (lowercase), but the script would
-          reference <code>row["Department"]</code>. The model's training bias pushes it to
+          Generated skills would read a user-supplied CSV whose headers are in lowercase
+          (eg '<code>department</code>') but the script would reference
+          <code>row["Department"]</code>. The model's training bias pushes it to
           "correct" casing; the runtime then explodes with <code>KeyError</code>. We patched
           this with an explicit "preserve EXACT spelling, casing, and whitespace" rule in the
-          expand prompt. Ugly to shout at the model, but it works.
+          expand prompt.
         </p>
 
         <div class="codeblock" data-filename="backend/app/prompts/expand.md">
@@ -555,12 +547,10 @@ casing causes runtime KeyError / column-not-found failures.
 
         <h3>Auto-retry with error feedback</h3>
         <p>
-          If validation fails, we do not just surface errors to the user. The
+          If validation fails, the
           <code>preview()</code> orchestrator loops up to three times. On each failure the
           concatenated error messages are injected back into the expand prompt as a "previous
-          generation had errors" appendix, and Gemini regenerates. Empirically most failures
-          are fixed on the first retry — the model is good at correcting errors it can see,
-          just bad at pre-empting them.
+          generation had errors" appendix, and Gemini regenerates.
         </p>
 
         <div class="codeblock" data-filename="backend/app/architect/preview.py">
@@ -608,18 +598,8 @@ casing causes runtime KeyError / column-not-found failures.
           concrete use-case details the user mentioned: column names, filter values, file
           shapes, thresholds. Those details are assembled into a placeholder like "e.g.,
           filter <em>status = active</em>, sort by <em>created_at</em> descending" so the
-          empty box becomes a prompt that demonstrates what a good refinement looks like.
-        </p>
-
-        <p>
-          The hint is just a placeholder — it does not auto-fill, and if the user types
-          nothing the skill is saved with its generated description. What it does is make
-          the affordance legible: users now see what kind of steer is expected, and the
-          most common edit — "keep this generic but always filter out archived rows" —
-          happens in two seconds rather than as a staring contest with an empty field.
-          The same <code>conversation_context</code> is also read server-side by
-          <code>architect.py</code> when constructing the generation prompt, so the
-          user-facing hint and the Architect's own context come from the same source.
+          empty box becomes a prompt that suggests to the user what sort of refinements they
+          can explore.
         </p>
 
         <h3>Skill evolution</h3>
@@ -751,9 +731,7 @@ casing causes runtime KeyError / column-not-found failures.
 
         <h3>Per-user images</h3>
         <p>
-          Skills can declare a <code>requirements.txt</code>. We do not want a new session to
-          pay <code>pip install</code> for every skill it touches, and we do not want to bake
-          every user's deps into the base image. Our compromise: when a user's library
+          Skills can declare a <code>requirements.txt</code>. When a user's library
           changes, we aggregate all <code>requirements.txt</code> files into a master list and
           build a personalised image layered on top of <code>autoskill-sandbox</code> in the
           background. A user's first session after adding a new skill may fall through to the
