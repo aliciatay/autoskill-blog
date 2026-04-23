@@ -884,8 +884,6 @@ casing causes runtime KeyError / column-not-found failures.
           <dd>Next.js on Vercel. One env var: <code>NEXT_PUBLIC_BACKEND_URL</code>.</dd>
           <dt>backend</dt>
           <dd>EC2 behind a DuckDNS domain (<code>auto-skill.duckdns.org</code>) with a Let's Encrypt cert terminating TLS at port 443. The host has Docker installed and <code>docker.sock</code> mounted into the backend container, so FastAPI can <code>docker run</code> session containers on the host — a DinD-style setup. Cert auto-renews via the standard <code>certbot</code> cron.</dd>
-          <dt>Gemini billing</dt>
-          <dd>Calls are quota-capped on the Gemini API; we stayed inside the free tier for normal demo usage. Flash Lite for the trigger (cheap, high volume), the main model for extract/expand (rarer, heavier).</dd>
           <dt>cost</dt>
           <dd>EC2 is the main fixed cost (~$1/day on-demand). Gemini calls are the variable cost.</dd>
         </dl>
@@ -1005,7 +1003,6 @@ casing causes runtime KeyError / column-not-found failures.
   remountPipeline();
 
   ReactDOM.createRoot(document.getElementById('arch-mount')).render(<ArchitectureDiagram/>);
-  ReactDOM.createRoot(document.getElementById('chat-mount')).render(<ChatMock/>);
   ReactDOM.createRoot(document.getElementById('stepper-mount')).render(<ValidationStepper/>);
   ReactDOM.createRoot(document.getElementById('ba-mount')).render(<BeforeAfter/>);
 
