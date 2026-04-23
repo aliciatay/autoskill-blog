@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AutoSkill Blog · Variations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet"/>
+  <style>
+    body { margin:0; background:#f0eee9; font-family:'Inter',system-ui,sans-serif; color:#2b2920; }
+    .intro {
+      position: fixed; top: 20px; left: 20px; z-index: 5;
+      background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,0.08); padding: 14px 18px;
+      max-width: 320px; border-radius: 3px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .intro h1 { margin: 0 0 4px; font-family: 'Source Serif 4', serif; font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+    .intro p { margin: 0; font-size: 12.5px; line-height: 1.5; color: #6b6558; }
+    .intro a { color: #2b2920; text-decoration-color: rgba(0,0,0,0.2); }
+    .open-btn {
+      position: fixed; top: 20px; right: 20px; z-index: 5;
+      background: #15140f; color: #fbfaf7; padding: 10px 16px;
+      font-family: 'Inter', sans-serif; font-size: 12.5px; letter-spacing: 0.04em;
+      text-decoration: none; border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>AutoSkill Blog · aesthetic variations</h1>
+  <p>Three directions for the same technical essay. The primary is <strong>light editorial / indigo</strong>; dark-amber and light-mono are alternates. Open any artboard fullscreen, or click through to the live blog.</p>
+</div>
+<a class="open-btn" href="AutoSkill Blog.html">Open live blog →</a>
+
+<div id="canvas-root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="../design-canvas.jsx"></script>
+
+<script type="text/babel">
+  const VariantCard = ({ src, label, kicker, note }) => (
+    <div style={{
+      width: 720, height: 900, background: '#fff',
+      position: 'relative', overflow: 'hidden',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06)'
+    }}>
+      <div style={{
+        position: 'absolute', top: 16, left: 18, zIndex: 2,
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
+        letterSpacing: '0.14em', textTransform: 'uppercase',
+        color: 'rgba(0,0,0,0.5)', background: 'rgba(255,255,255,0.8)',
+        padding: '3px 8px', borderRadius: 2
+      }}>
+        {kicker}
+      </div>
+      <img src={src} style={{
+        width: '100%', display: 'block',
+        imageRendering: 'auto'
+      }}/>
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        padding: '16px 22px', background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)',
+        color: '#fff', fontFamily: 'Source Serif 4, serif'
+      }}>
+        <div style={{ fontSize: 19, fontStyle: 'italic', marginBottom: 3 }}>{label}</div>
+        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, opacity: 0.85 }}>{note}</div>
+      </div>
+    </div>
+  );
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection
+          id="variations"
+          title="Aesthetic variations"
+          subtitle="Same content, three treatments. Click ⤢ to focus, drag the grip to reorder."
+        >
+          <DCArtboard id="v1" label="Primary · Light Editorial + Indigo" width={720} height={900}>
+            <VariantCard
+              src="variants/light-indigo.jpg"
+              kicker="01 · RECOMMENDED"
+              label="Light editorial · indigo"
+              note="Warm paper #fbfaf7, Source Serif 4, indigo oklch(0.48 0.15 270). Reading-first, long-form."
+            />
+          </DCArtboard>
+
+          <DCArtboard id="v2" label="Alt · Dark + Amber" width={720} height={900}>
+            <VariantCard
+              src="variants/dark-amber.jpg"
+              kicker="02 · ALTERNATE"
+              label="Dark editorial · amber"
+              note="Matches the AutoSkill product's dark surface. Amber accent signals 'review carefully' in the product too."
+            />
+          </DCArtboard>
+
+          <DCArtboard id="v3" label="Alt · Light Mono" width={720} height={900}>
+            <VariantCard
+              src="variants/light-mono.jpg"
+              kicker="03 · ALTERNATE"
+              label="Light editorial · monochrome"
+              note="No hue accent. Most academic-feeling. Best for print-first or read-to-PDF contexts."
+            />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="notes"
+          title="Notes on the chosen direction"
+          subtitle="What the primary variant commits to."
+        >
+          <DCArtboard id="n1" label="Type & Color System" width={520} height={380}>
+            <div style={{ padding: '28px 32px', fontFamily: 'Source Serif 4, serif', color: '#15140f', background: '#fbfaf7', height: '100%' }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 10, letterSpacing: '0.14em', color: '#6b6558', textTransform: 'uppercase', marginBottom: 10 }}>System · primary</div>
+              <div style={{ fontSize: 32, fontStyle: 'italic', marginBottom: 6, letterSpacing: '-0.02em' }}>Source Serif 4</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: '#6b6558', marginBottom: 22 }}>Display + body · warmth, readability</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 16, marginBottom: 6 }}>Inter</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: '#6b6558', marginBottom: 22 }}>UI · labels, metadata, tables</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, marginBottom: 6 }}>JetBrains Mono</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: '#6b6558', marginBottom: 22 }}>Code + section counters</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                {[
+                  ['#fbfaf7', 'paper'],
+                  ['#15140f', 'ink'],
+                  ['oklch(0.48 0.15 270)', 'accent'],
+                  ['#e5e1d6', 'rule'],
+                  ['#6b6558', 'muted']
+                ].map(([c, n]) => (
+                  <div key={n} style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ background: c, height: 42, border: '1px solid rgba(0,0,0,0.08)' }}/>
+                    <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: '#6b6558', marginTop: 4 }}>{n}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DCArtboard>
+
+          <DCArtboard id="n2" label="Interactive Elements" width={520} height={380}>
+            <div style={{ padding: '28px 32px', fontFamily: 'Source Serif 4, serif', color: '#15140f', background: '#fbfaf7', height: '100%' }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 10, letterSpacing: '0.14em', color: '#6b6558', textTransform: 'uppercase', marginBottom: 14 }}>Interactive surface · seven pieces</div>
+              {[
+                ['01', 'Animated pipeline diagram', 'Observer → Architect → Integrator packet flow'],
+                ['02', 'Architecture diagram', 'Hoverable nodes with role tooltips'],
+                ['03', 'Live-feeling chat mock', 'Trigger fires, candidate card appears'],
+                ['04', 'Validation stepper', 'AST → sandbox ladder, play to animate'],
+                ['05', 'Before / after SKILL.md', 'Skill evolution with inline diff'],
+                ['06', 'Expandable code blocks', 'SKILL.md example + docker mount layout'],
+                ['07', 'TOC with scrollspy', '15 sections, fixed-rail navigation']
+              ].map(([n, t, s]) => (
+                <div key={n} style={{ display: 'flex', gap: 12, padding: '5px 0', borderBottom: '1px solid #e5e1d6' }}>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: '#6b6558', width: 20 }}>{n}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Inter', fontSize: 12.5, fontWeight: 500 }}>{t}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: '#6b6558' }}>{s}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('canvas-root')).render(<App/>);
+</script>
+</body>
+</html>

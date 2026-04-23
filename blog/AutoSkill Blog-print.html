@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AutoSkill — Implementation Notes</title>
+  <link rel="stylesheet" href="styles.css?v=3"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    @page { size: A4; margin: 18mm 16mm 20mm; }
+
+    @media print {
+      html, body {
+        background: #fbfaf7 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        color-adjust: exact;
+      }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .tweaks-fab, .tweaks-panel { display: none !important; }
+      .toc { display: none !important; }
+      .meta-bar { border-bottom: 1px solid #d9d4c5; padding-bottom: 8px; margin-bottom: 14px; }
+
+      .page { max-width: 100% !important; padding: 0 !important; }
+      .body-grid { display: block !important; padding: 0 !important; gap: 0 !important; }
+      .article { max-width: 100% !important; }
+      .column, .wide { max-width: 100% !important; margin: 0 !important; }
+
+      .hero { padding: 8mm 0 6mm !important; page-break-after: avoid; }
+      .hero-title { font-size: 40pt !important; line-height: 1.05 !important; }
+      .hero-sub { font-size: 13pt !important; max-width: 100% !important; }
+      .byline { padding-top: 10mm !important; }
+
+      body { font-size: 10.5pt !important; line-height: 1.55 !important; }
+      h2 { font-size: 18pt !important; margin: 10mm 0 4mm !important; break-before: page; break-after: avoid; }
+      h3 { font-size: 13pt !important; margin: 6mm 0 2mm !important; break-after: avoid; }
+      h4 { font-size: 11pt !important; break-after: avoid; }
+      p, li { orphans: 3; widows: 3; }
+
+      section:first-of-type h2 { break-before: avoid !important; }
+
+      figure, .codeblock, .close-call, .tldr, .stepper, .chat-mock,
+      .ba, .vid-placeholder, .mini-table, table, .demo {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      figure { margin: 4mm 0 !important; }
+      .figure-wide { margin-left: 0 !important; width: 100% !important; }
+      figcaption { font-size: 8.5pt !important; }
+
+      svg { max-width: 100% !important; height: auto !important; }
+      #pipeline-mount svg { max-height: 90mm !important; }
+      #arch-mount svg { max-height: 100mm !important; }
+
+      .demo-frame img { max-height: 110mm !important; width: auto !important; max-width: 100% !important; margin: 0 auto; }
+      .demo-frame { background: #15140f !important; text-align: center; }
+      .demo-bullets { font-size: 9.5pt !important; }
+
+      .codeblock.collapsed pre { max-height: none !important; overflow: visible !important; }
+      .codeblock.collapsed pre::after { display: none !important; }
+      .codeblock pre { font-size: 8pt !important; line-height: 1.45 !important; white-space: pre-wrap; word-break: break-word; }
+      .codeblock-toggle { display: none !important; }
+
+      .stepper-row.active { background: transparent !important; }
+      .stepper-controls { display: none !important; }
+
+      .chat-msg, .chat-candidate { opacity: 1 !important; transform: none !important; }
+      .ba-body { max-height: none !important; overflow: visible !important; min-height: 0 !important; }
+      #pipeline-mount svg circle[r] { display: none !important; }
+
+      .cta-row { break-inside: avoid; }
+      .pull { font-size: 14pt !important; margin: 6mm 0 !important; }
+      footer { border-top: 1px solid #d9d4c5 !important; padding: 6mm 0 0 !important; font-size: 8.5pt !important; margin-top: 10mm; }
+
+      #tldr { break-before: avoid !important; }
+      .cta-card { border: 1px solid #d9d4c5 !important; }
+      .close-call { border: 1px solid #d9d4c5 !important; background: #f5f2ea !important; padding: 4mm 5mm !important; }
+      .tldr { background: #f5f2ea !important; border: 1px solid #d9d4c5 !important; border-left: 2pt solid oklch(0.48 0.15 60) !important; }
+      .mini-table { font-size: 9pt !important; }
+      .mini-table th, .mini-table td { padding: 4px 8px !important; }
+    }
+
+    @media screen {
+      body::before {
+        content: "Print preview — use browser Print dialog (Cmd/Ctrl+P) to save as PDF";
+        position: fixed; top: 0; left: 0; right: 0;
+        background: #15140f; color: #fbfaf7;
+        padding: 10px 16px; font-family: 'Inter', sans-serif; font-size: 12px;
+        text-align: center; z-index: 999; letter-spacing: 0.04em;
+      }
+      body { padding-top: 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+  <div class="meta-bar">
+    <div class="brand"><span class="meta-brand-dot"></span> AutoSkill · Implementation Notes</div>
+    <div><span id="readtime">22 min read</span> · <span>CS5260 · NN2</span></div>
+  </div>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="column">
+      <div class="hero-kicker">
+        Technical Report <span class="dot"></span> April 2026 <span class="dot"></span> v1.0
+      </div>
+      <h1 class="hero-title">
+        Chat once,<br/><em>codify automatically,</em><br/>reuse forever.
+      </h1>
+      <p class="hero-sub">
+        AutoSkill is a middleware layer that passively observes LLM chat sessions and
+        converts repeatable workflows into reusable agent skills — without the user writing
+        frontmatter, parameter schemas, or scripts.
+      </p>
+      <div class="byline">
+        <div class="authors">
+          <strong>Alicia Tay</strong> · <strong>Andrew Walker</strong> · <strong>Edwin Lau</strong> · <strong>Nurliana As-Saad</strong>
+        </div>
+        <div>NUS · CS5260 Neural Networks II</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="body-grid">
+    <aside class="toc">
+      <div class="toc-label">Contents</div>
+      <ol id="toc-list">
+        <li><a href="#tldr">TL;DR</a></li>
+        <li><a href="#why">Why we built this</a></li>
+        <li><a href="#primer">The shape of a skill</a></li>
+        <li><a href="#system">The system, from 30,000 ft</a></li>
+        <li><a href="#observer">Observer</a></li>
+        <li><a href="#architect">Architect</a></li>
+        <li><a href="#integrator">Integrator</a></li>
+        <li><a href="#sandbox">Docker sandbox</a></li>
+        <li><a href="#beyond">Beyond the proposal</a></li>
+        <li><a href="#frontend">Frontend surface</a></li>
+        <li><a href="#eval">Evaluation</a></li>
+        <li><a href="#deploy">Deployment</a></li>
+        <li><a href="#limits">Limitations &amp; next</a></li>
+        <li><a href="#small">Small things we sweated</a></li>
+        <li><a href="#close">Close calls</a></li>
+      </ol>
+    </aside>
+
+    <article class="article">
+
+      <!-- TL;DR -->
+      <section id="tldr">
+        <h2>TL;DR</h2>
+        <div class="tldr">
+          <div class="tldr-label">One paragraph</div>
+          <p>
+            Chat with an AI is ephemeral by default. You solve a problem once — parse a messy
+            CSV, hit an API, reshape a report — and next time you start from zero. AutoSkill is
+            middleware that makes it compound. You chat normally; in the background an
+            <em>Observer</em> watches a rolling chat buffer (the last 40 messages), an
+            <em>Architect</em> extracts parameterisable bits and generates a
+            <code>SKILL.md</code> + Python script, validates it in a Docker sandbox, and an
+            <em>Integrator</em> mounts the approved skill into the agent's workspace for
+            every future session.
+          </p>
+          <p style="margin-bottom:0">
+            In one line: <strong>chat once, codify automatically, reuse forever.</strong>
+          </p>
+        </div>
+
+        <figure class="figure-wide">
+          <div id="pipeline-mount"></div>
+          <figcaption><b>Figure 1</b> Observer → Architect → Integrator. The only authored input is natural conversation; the output is a well-formed skill folder mounted back into the agent on the next turn.</figcaption>
+        </figure>
+
+        <p>
+          What we built over the semester:
+        </p>
+        <ul>
+          <li>A three-phase pipeline — <strong>Observer → Architect → Integrator</strong> — behind a FastAPI backend with a Next.js 16 frontend.</li>
+          <li>A per-session Docker sandbox that runs the Gemini CLI agent and validates generated scripts before a user ever sees them.</li>
+          <li>Two-step skill generation (parameter extraction → parameterised skill), a layered validation ladder with auto-retry, and an embedding-based duplicate-skill check.</li>
+          <li>Beyond the proposal: skill evolution (refine an existing skill in natural language), Worker profiles, a session-scoped Files panel, and skill version history.</li>
+        </ul>
+
+        <div class="cta-row">
+          <a class="cta-card" href="https://auto-skill.vercel.app" target="_blank" rel="noopener">
+            <span class="cta-arrow">→</span>
+            <div class="cta-label">Live demo</div>
+            <div class="cta-value">auto-skill.vercel.app</div>
+          </a>
+          <a class="cta-card" href="https://github.com/ykedwinlau-ai/CS5260-Project-AutoSkill" target="_blank" rel="noopener">
+            <span class="cta-arrow">→</span>
+            <div class="cta-label">Source</div>
+            <div class="cta-value">github.com/…/AutoSkill</div>
+          </a>
+        </div>
+
+        <figure>
+          <div class="demo-frame">
+            <img src="demos/01-chat.gif" alt="AutoSkill chat interface — a user types a CSV processing request, the agent answers, and an Observer toast appears in the corner indicating a candidate skill is being assessed."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 1</span> Natural-language chat surface · No setup required</div>
+          <ul class="demo-bullets">
+            <li>Natural-language interface for task execution — no setup, no coding.</li>
+            <li>Works like any chat agent on the surface; the observation layer is invisible.</li>
+            <li>Every turn is silently inspected for repeatable workflow patterns.</li>
+          </ul>
+          <figcaption><b>Figure 2</b> The user-facing surface. AutoSkill looks like an ordinary chat client; the entire skill-synthesis pipeline runs off-thread and only interrupts when there is a skill worth reviewing.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Why -->
+      <section id="why">
+        <h2>Why we built this</h2>
+        <p>
+          Non-technical users live inside chat interfaces. The interface is great for
+          conversational problem-solving — you describe what you want, the model reasons back —
+          but it is <em>structurally</em> bad at compounding. Every session starts cold. Every
+          workflow gets re-explained. If you got a clever prompt to work last Tuesday, you
+          either re-type it from memory next Tuesday, paste it from a notes file, or give up
+          and prompt from scratch.
+        </p>
+        <p>
+          The industry's answer is <strong>Agent Skills</strong>: small, declarative packages
+          that extend an agent's native capabilities. A skill is a directory with a
+          <code>SKILL.md</code> spec, optional Python scripts, and optional references.
+          Frameworks like the Gemini CLI pick them up automatically and route to them when a
+          user's request matches the skill's description.
+        </p>
+        <p>
+          Skills are a good answer to the compounding problem. The catch:
+          <em>writing</em> them is still a developer activity. You draft YAML frontmatter,
+          articulate when the skill should fire, decide which values should be parameters,
+          write the script, test it. That is a hard ask for someone who opened a chat tab
+          because they did not want to write code.
+        </p>
+        <blockquote>
+          Can a middleware layer passively observe chats, recognise the skill-shaped ones, and
+          codify them automatically with high enough quality that the user only has to review
+          and approve?
+        </blockquote>
+        <p>
+          This report is the implementation write-up. It is not an argument for novelty
+          (others are exploring this shape); it is the engineering decisions, tradeoffs, and
+          close calls behind our particular version.
+        </p>
+      </section>
+
+      <!-- Primer -->
+      <section id="primer">
+        <h2>The shape of a skill</h2>
+        <p>
+          Readers familiar with Agent Skills can skip ahead. For everyone else: a
+          <strong>skill</strong> is a folder that looks roughly like this.
+        </p>
+
+        <div class="codeblock" data-filename="csv_column_summary/">
+          <div class="codeblock-header">
+            <span class="codeblock-filename">csv_column_summary/</span>
+            <span style="font-family:var(--sans);font-size:11px;color:var(--muted)">tree</span>
+          </div>
+          <pre><code><span class="tok-com">├──</span> SKILL.md          <span class="tok-com"># required — spec + frontmatter</span>
+<span class="tok-com">├──</span> scripts/
+<span class="tok-com">│   └──</span> summarise.py  <span class="tok-com"># optional — executable logic</span>
+<span class="tok-com">├──</span> references/       <span class="tok-com"># optional — static docs the agent reads</span>
+<span class="tok-com">└──</span> assets/           <span class="tok-com"># optional — templates, fixtures</span></code></pre>
+        </div>
+
+        <p>
+          <code>SKILL.md</code>'s YAML frontmatter declares <em>when</em> the skill fires (a
+          description the host uses for retrieval) and <em>what</em> inputs it takes. The
+          Markdown body is prose instruction the agent reads when it decides to load the skill.
+        </p>
+
+        <div id="codeblock-mount-skillmd"></div>
+
+        <p>
+          When the host agent sees a user message, it checks its available skills, matches on
+          <code>description</code>, and — if a skill fits — loads the body and executes the
+          referenced script with the extracted arguments. AutoSkill's job is to produce these
+          folders automatically, from conversation history that was never meant to be a spec.
+        </p>
+      </section>
+
+      <!-- System -->
+      <section id="system">
+        <h2>The system, from 30,000 ft</h2>
+        <p>
+          AutoSkill sits between the browser and the agent. It is stateful middleware, not a
+          new chat product: the UX looks like a normal chat, but every message passes through
+          an observation layer that branches the conversation into a rolling buffer, and a
+          skill-synthesis pipeline runs asynchronously off that buffer.
+        </p>
+
+        <figure class="figure-wide">
+          <div id="arch-mount"></div>
+          <figcaption><b>Figure 3</b> Hover any node to see its role. Browser → FastAPI gateway → per-session buffer → Flash Lite trigger → two-step Architect → validator (fresh Docker per script) → on-disk skills library → mounted read-only into the session sandbox.</figcaption>
+        </figure>
+
+        <p>Two details shape everything that follows.</p>
+        <ol>
+          <li>
+            <strong>Everything the agent executes runs inside a per-session Docker container.</strong>
+            The chat agent is the Gemini CLI, spawned in our <code>autoskill-sandbox</code>
+            image. Generated scripts are validated in the <em>same</em> image a separate
+            sandbox runs later in production. Validation and execution share an environment,
+            which matters for reproducibility.
+          </li>
+          <li>
+            <strong>Storage is file-based, not a database.</strong> Skills, session state, and
+            generated files all live on disk under the backend's working directory. This was a
+            deliberate scope choice and the first thing we would change if we productionised
+            this.
+          </li>
+        </ol>
+      </section>
+
+      <!-- Observer -->
+      <section id="observer">
+        <h2>Observer — deciding when a conversation is a skill</h2>
+
+        <h3>The buffer</h3>
+        <p>
+          Every message — user or model — is appended to an in-memory <code>deque</code>
+          capped at 40 entries per session. We picked 40 because skill-worthy workflows are
+          usually 6–12 turns long, and we wanted headroom for a trigger to still catch a
+          workflow when the user drifts into unrelated follow-ups before deciding to save. The
+          buffer is per-session, lives in a process-local dict, and is wiped on "New Chat" or
+          after 2 minutes without a frontend heartbeat.
+        </p>
+
+        <h3>The trigger</h3>
+        <p>
+          After the assistant's reply finishes streaming, a lightweight Gemini Flash Lite call
+          — the <strong>trigger evaluator</strong> — reads the full buffer. The prompt frames
+          the decision around one question:
+        </p>
+        <p class="pull">
+          After this conversation, who would perform the steps: the AI or the human?
+        </p>
+        <p>
+          If the AI performed the work — produced code, ran a sequence of tools, generated an
+          artifact — it is a skill candidate. If the AI gave the human instructions to follow,
+          it is not. The test is blunt but removes an entire class of false positives: chat
+          threads that look skill-shaped on the surface but have no executable content.
+        </p>
+
+        <p>On top of that test, the prompt layers four filters. A turn only becomes a candidate if all four hold:</p>
+        <ul>
+          <li>the output is <strong>concrete and executable</strong> — code, a file, a tool call result;</li>
+          <li>there is <strong>more than one distinct step</strong>;</li>
+          <li>the workflow is <strong>repeatable with different inputs</strong>;</li>
+          <li>the task <strong>completed successfully</strong>.</li>
+        </ul>
+
+        <h3>The "did the agent already use a skill?" branch</h3>
+        <p>
+          A separate AI-fallback check reads a <code>[System Alert]</code> annotation we
+          inject into the transcript whenever the assistant invoked an existing skill. If
+          the model used an existing skill <em>and succeeded</em>, the turn is not a
+          candidate — we do not want to shadow-duplicate a perfect execution. If it used an
+          existing skill but had to drop into custom code to finish, it <em>is</em> a
+          candidate: the existing skill needs to evolve. This branch is what later wires
+          into <a href="#beyond">skill evolution</a> rather than creating a duplicate.
+        </p>
+
+        <h3>Full buffer, not a rolling window</h3>
+        <p>
+          The proposal originally called for evaluating the trigger on a rolling window of
+          the last N messages. We changed it to the full 40-message buffer for two reasons.
+        </p>
+        <p>
+          First, skill-worthy workflows often straddle a clarification exchange — the user
+          asks, the model asks back, the user answers, the model does the work. A window
+          narrow enough to evaluate cheaply might cut the setup off and miss the
+          parameterisable inputs. Second, triggering on the same buffer the user can see in
+          the UI makes the system's behaviour predictable: when a candidate appears, it is
+          always explainable by what is visible above it.
+        </p>
+
+        <h3>Live example</h3>
+        <figure>
+          <div id="chat-mount"></div>
+          <figcaption><b>Figure 4</b> A representative session. The Observer only fires once the final assistant turn confirms the workflow completed successfully; the candidate card is surfaced after the stream's <code>done</code> event so users never wait for it.</figcaption>
+        </figure>
+
+        <h3>Robustness</h3>
+        <p>Three details made the trigger production-feasible:</p>
+        <dl class="def">
+          <dt>retry</dt>
+          <dd>3-attempt cap with exponential backoff, but <em>only</em> on rate-limit and 503 signatures. Genuine failures fail fast.</dd>
+          <dt>timeout</dt>
+          <dd>60-second wall-clock wrapper via <code>asyncio.wait_for</code>; exceeded triggers are swallowed so the chat stream stays healthy.</dd>
+          <dt>non-block</dt>
+          <dd>We yield the <code>{"done": true}</code> event <em>before</em> awaiting the trigger result. The candidate arrives as a later SSE event when ready, or not at all.</dd>
+          <dt>dismiss map</dt>
+          <dd>Per-session <code>_dismissed_candidates</code> filters suppressed names so the same candidate is never re-surfaced until a genuinely new session.</dd>
+        </dl>
+      </section>
+
+      <!-- Architect -->
+      <section id="architect">
+        <h2>Architect — from candidate to validated skill</h2>
+        <p>
+          When a candidate survives the trigger and the user clicks "Review Skill," the
+          Architect runs. It is the most code-heavy part of the system and the one where
+          failures would be most visible, so we invested the most in graceful degradation.
+        </p>
+
+        <h3>Two-step generation</h3>
+        <p>
+          The obvious approach is one big prompt: "here is the conversation, give me a full
+          <code>SKILL.md</code> with scripts and parameters." We tried it; it produced
+          good-looking skills that were subtly wrong — inventing parameters that weren't
+          really variable, or baking in values that should have been parameters. We split the
+          call in two.
+        </p>
+
+        <dl class="def">
+          <dt>step 1</dt>
+          <dd><strong>Parameter extraction.</strong> A Gemini call whose only job is to survey the conversation for hard-coded specifics (file paths, dates, column names, thresholds). Schema-constrained via Pydantic + <code>response_schema</code>. Temperature 0.2.</dd>
+          <dt>step 2</dt>
+          <dd><strong>Skill generation.</strong> A second call that takes the extracted schema and produces the full <code>SKILL.md</code>, scripts, assets, and references as a <code>SkillManifest</code>. The prompt says "replace every example value from Step 1 with the corresponding <code>{param}</code> placeholder." Temperature 0.3.</dd>
+        </dl>
+
+        <p>
+          The split is not free — it is two API calls per skill — but it produces skills whose
+          parameter schema and content are coherent with each other, because Step 2 is
+          <em>anchored</em> on Step 1's output rather than inventing both in the same pass.
+        </p>
+
+        <h3>The "preserve exact casing" rule</h3>
+        <p>
+          One subtle failure mode nearly bit us. Generated skills would read a user-supplied
+          CSV whose header was <code>department</code> (lowercase), but the script would
+          reference <code>row["Department"]</code>. The model's training bias pushes it to
+          "correct" casing; the runtime then explodes with <code>KeyError</code>. We patched
+          this with an explicit "preserve EXACT spelling, casing, and whitespace" rule in the
+          expand prompt. Ugly to shout at the model, but it works.
+        </p>
+
+        <h3>The validation ladder</h3>
+        <figure>
+          <div id="stepper-mount"></div>
+          <figcaption><b>Figure 5</b> Validation ladder. Layer 1 is syntactic and synchronous — fast. Layer 2 is a fresh Docker dry-run per script with example parameters and the session's uploads mounted read-only.</figcaption>
+        </figure>
+
+        <figure class="demo">
+          <div class="demo-frame">
+            <img src="demos/02-architect.gif" alt="The 'Edit Skill Details' review modal opens over the chat. Skill name and description are pre-filled — filter_and_sort_csv — and a Generating spinner indicates the second-pass expand call is in flight."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 2</span> Architect detects a workflow and drafts a skill</div>
+          <ul class="demo-bullets">
+            <li>Architect automatically detects repeatable workflows from the chat buffer.</li>
+            <li>Converts the workflow into a structured <code>SKILL.md</code> definition with parameters.</li>
+            <li>User-in-the-loop: the review modal opens for inspection and edit before save.</li>
+          </ul>
+        </figure>
+
+        <p>Two softenings in Layer 2 matter more than they look.</p>
+        <ul>
+          <li><strong>Argparse unrecognized-args retry.</strong> If a script exits with <code>unrecognized arguments</code>, we strip the offending flags and retry once. Gemini sometimes hallucinates an <code>--output</code> flag when the script prints to stdout; this distinguishes "the script is broken" from "the caller passed a flag the script doesn't take."</li>
+          <li><strong>Empty-stderr soft-pass.</strong> If a script exits non-zero with empty stderr, we treat it as a warning and move on. Most commonly the script needs a real input file and the read-only mount hit a file the user never uploaded. Treating this as an error would reject valid skills.</li>
+        </ul>
+
+        <h3>Auto-retry with error feedback</h3>
+        <p>
+          If validation fails, we do not just surface errors to the user. The
+          <code>preview()</code> orchestrator loops up to three times. On each failure the
+          concatenated error messages are injected back into the expand prompt as a "previous
+          generation had errors" appendix, and Gemini regenerates. Empirically most failures
+          are fixed on the first retry — the model is good at correcting errors it can see,
+          just bad at pre-empting them.
+        </p>
+
+        <h3>Skill evolution</h3>
+        <p>
+          The same <code>preview()</code> function powers skill evolution. When a user refines
+          an existing skill in natural language, we concatenate the instructions under an
+          <code>Additional instructions:</code> delimiter; the extract step strips the suffix
+          so it does not pollute parameter detection, and the expand step injects it via the
+          <code>{{ additional_instructions }}</code> slot so the instructions shape both the
+          body and the scripts.
+        </p>
+
+        <figure class="demo">
+          <div class="demo-frame">
+            <img src="demos/04-refine.gif" alt="The review modal showing the freshly drafted filter-and-sort-csv skill, with the user editing the description field directly to refine the skill before saving."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 4</span> No-code skill refinement during creation</div>
+          <ul class="demo-bullets">
+            <li>Refine the draft skill in plain language during the review step — no code required.</li>
+            <li>Edits flow through the same <code>preview()</code> orchestrator that powers initial generation.</li>
+          </ul>
+        </figure>
+
+        <figure>
+          <div id="ba-mount"></div>
+          <figcaption><b>Figure 6</b> Before / after a one-line natural-language refinement: "only handle CSVs, ignore JSON." The old version is snapshotted to <code>versions/</code> before overwriting.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Integrator -->
+      <section id="integrator">
+        <h2>Integrator — saving, mounting, versioning</h2>
+        <p>
+          The Integrator is the least glamorous phase and has the fewest moving parts —
+          exactly what we want from a persistence layer.
+        </p>
+
+        <h3>On-disk layout</h3>
+        <p>
+          Skills live under <code>backend/users/&lt;user_id&gt;/skills/&lt;slug&gt;/</code>.
+          Each folder follows the Gemini CLI convention: <code>SKILL.md</code> at root, plus
+          optional <code>scripts/</code>, <code>references/</code>, <code>assets/</code>. No
+          LLM call happens at save time — generation already happened during preview — so
+          approval is instant.
+        </p>
+
+        <h3>Version snapshots on every mutation</h3>
+        <p>
+          Every update path snapshots the current state <em>before</em> overwriting, to a
+          numbered sibling under <code>versions/</code>. Listing and restore are exposed via
+          <code>GET /api/skills/{slug}/versions</code> and
+          <code>POST /api/skills/{slug}/versions/{v}/restore</code>. Snapshot-then-overwrite
+          order is load-bearing: if we overwrote first, a user evolving a skill and hating the
+          result would have nothing to roll back to.
+        </p>
+
+        <h3>Mounting into the agent</h3>
+        <p>
+          At the start of every CLI call, <code>_setup_session_workspace</code> creates (or
+          refreshes) a per-session working directory, copies the skill folders into
+          <code>.gemini/skills/</code>, and seeds <code>.gemini/</code> from a template. Active
+          vs inactive is expressed as a <code>.inactive</code> marker file inside the skill
+          folder. For long-running sessions, <code>_sync_session_skills</code> does a lazy
+          diff and only adds or removes the delta — in most turns the diff is empty.
+        </p>
+
+        <figure class="demo">
+          <div class="demo-frame">
+            <img src="demos/03-reuse.gif" alt="A new chat session: the user uploads employees.csv and asks the agent to filter and sort it. A green FILTER-AND-SORT-CSV chip appears under the assistant message and the resulting table renders inline."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 3</span> Skill auto-applied in a new session</div>
+          <ul class="demo-bullets">
+            <li>The agent automatically picks up the relevant skill — no prompt engineering needed.</li>
+            <li>Repeated tasks become fast and consistent; the same parameters surface predictably.</li>
+            <li>Each invocation is logged and feeds back into refinement candidates.</li>
+          </ul>
+        </figure>
+      </section>
+
+      <!-- Sandbox -->
+      <section id="sandbox">
+        <h2>The Docker sandbox</h2>
+        <p>
+          Everything the agent executes runs inside a per-session Docker container. This is
+          where the largest share of our engineering time went.
+        </p>
+
+        <h3>One container per session, long-lived</h3>
+        <p>
+          On the first message, the backend spawns a container
+          <code>autoskill-session-{session_id}</code> from the <code>autoskill-sandbox</code>
+          image, running <code>tail -f /dev/null</code>. Every subsequent message in the
+          session runs through the same container via <code>docker exec</code>, so
+          conversational state (Gemini CLI <code>--resume</code>), cached dependencies, and
+          in-workspace files all persist at near-zero overhead. A background task removes the
+          container and its workspace once a session has been silent for 2 minutes.
+        </p>
+
+        <h3>The mount layout</h3>
+        <div id="mount-code"></div>
+
+        <p>
+          The agent can write to its working directory freely — that is how it produces
+          artifacts — but it cannot modify the skills themselves.
+        </p>
+
+        <h3>Per-user images</h3>
+        <p>
+          Skills can declare a <code>requirements.txt</code>. We do not want a new session to
+          pay <code>pip install</code> for every skill it touches, and we do not want to bake
+          every user's deps into the base image. Our compromise: when a user's library
+          changes, we aggregate all <code>requirements.txt</code> files into a master list and
+          build a personalised image layered on top of <code>autoskill-sandbox</code> in the
+          background. A user's first session after adding a new skill may fall through to the
+          base image; every subsequent session starts with <code>pip</code> already done.
+        </p>
+
+        <h3>Validation sandboxes are separate</h3>
+        <p>
+          The validation sandbox is distinct from the chat sandbox. Each script dry-run spins
+          up a <em>fresh</em> <code>docker run --rm</code>, not an <code>exec</code> into the
+          live session. This matters for isolation — a half-validated script from a candidate
+          the user hasn't approved yet should not influence the session's live workspace.
+        </p>
+
+        <h3>Why Docker at all</h3>
+        <p>
+          We could have sandboxed using Python <code>subprocess</code> + <code>seccomp</code>,
+          or <code>firejail</code>, or a WebAssembly runtime. We chose Docker for three
+          reasons:
+        </p>
+        <ul>
+          <li><strong>Parity.</strong> Validation and the live agent run in the <em>same</em> image.</li>
+          <li><strong>Dependency handling.</strong> <code>requirements.txt</code> + <code>pip install</code> inside a container is boring and well-understood.</li>
+          <li><strong>Honesty about scope.</strong> We are a student project; we use the sandbox that has battle-tested isolation for arbitrary Python code.</li>
+        </ul>
+      </section>
+
+      <!-- Beyond -->
+      <section id="beyond">
+        <h2>Beyond the proposal</h2>
+        <p>Four features grew out of using the system ourselves.</p>
+
+        <h3>Duplicate-skill detection</h3>
+        <p>
+          The first time a teammate ran the same workflow twice with slightly different
+          wording, the system happily offered a second copy. We added an embedding-based
+          check: the candidate's <code>name + description</code> and every saved skill's
+          embed together in a single <code>gemini-embedding-001</code> batch call; cosine
+          similarity above <code>0.6</code> attaches a <code>SimilarSkillMatch</code> to the
+          candidate. The frontend surfaces it as an amber warning with an "Update Existing"
+          button.
+        </p>
+
+        <h3>Skill evolution</h3>
+        <p>
+          When the duplicate detector fires, the review modal opens in a side-by-side
+          comparison (see <a href="#architect">Figure&nbsp;6</a>). Submitting refines the
+          existing skill rather than creating a new one, via
+          <code>POST /api/skills/{slug}/evolve</code>. The previous version is snapshotted
+          automatically; one click restores it.
+        </p>
+
+        <h3>Worker profiles</h3>
+        <p>
+          A user with ten skills doesn't always want all ten available. Workers are named
+          bundles — "Data Ops," "Report Writer" — that override active/inactive flags for the
+          session they're launched under. When a chat session is launched with a
+          <code>worker_id</code>, the workspace-sync logic restricts the mounted skills to
+          exactly the worker's list.
+        </p>
+
+        <figure class="demo">
+          <div class="demo-frame">
+            <img src="demos/05-workers.gif" alt="A new chat with a small bee mascot in the corner indicating an active Worker. The chat suggestions are scoped to the worker's skill bundle."/>
+          </div>
+          <div class="demo-cap"><span class="demo-num">Demo 5</span> Workers — task-specialised skill bundles</div>
+          <ul class="demo-bullets">
+            <li>Workers introduce task specialisation — a session loads a curated subset of skills.</li>
+            <li>Workers execute only their assigned skills; everything else is invisible to that session.</li>
+            <li>Enables modular, reliable automation — a "Data Ops" worker won't accidentally fire a "Slack Reply" skill.</li>
+          </ul>
+        </figure>
+
+        <h3>Session-scoped Files panel</h3>
+        <p>
+          Any file the agent generates inside <code>/app/output</code> is persisted and
+          surfaced in a right-hand Files sidebar, streamed to the frontend via an SSE event
+          after each chat turn. Files have preview, one-click download, humanised sizes and
+          dates, and delete. They are session-scoped by design — the panel clears on "New
+          Chat" or when the zombie cleaner reaps the session.
+        </p>
+
+        <h3>Skill usage tracking</h3>
+        <p>
+          Every successful invocation of a skill is recorded to a per-user
+          <code>usage.json</code>. The "successful" qualifier is load-bearing: the
+          tool-result handler scans output for error signatures
+          (<code>Traceback</code>, <code>No such file</code>, <code>Permission denied</code>,
+          <code>Error:</code>) and only credits the skill if none are present. Counts feed
+          the Skills sidebar's sort order, so the most-used skills float to the top — and a
+          skill that errors out doesn't inflate its way up the list.
+        </p>
+      </section>
+
+      <!-- Frontend -->
+      <section id="frontend">
+        <h2>The frontend surface</h2>
+        <p>
+          Next.js 16 + React 19 in TypeScript, with Tailwind for layout and a small set of
+          single-purpose components. We kept the surface deliberately flat — one chat pane,
+          two collapsible sidebars (Skills left, Files right), a top bar.
+        </p>
+        <table class="mini-table">
+          <thead><tr><th>Component</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>SkillsSidebar.tsx</code></td><td>Library with category-coloured pills, pending candidates, similar-skill warnings, History tab.</td></tr>
+            <tr><td><code>SkillReviewModal.tsx</code></td><td>Create mode (single-panel preview, Monaco editor) and Evolve mode (side-by-side with NL refinement).</td></tr>
+            <tr><td><code>FilesSidebar.tsx</code></td><td>Generated files with preview / download / delete; badge on new-file arrival.</td></tr>
+            <tr><td><code>WorkerModal.tsx</code></td><td>Multi-select skill bundler with worker CRUD.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          Server communication is plain <code>fetch</code> against FastAPI; chat uses SSE with
+          a manual event-source-lite parser for <code>cli_stream</code>, <code>delta</code>,
+          <code>active_skill</code>, <code>done</code>, <code>candidate</code>,
+          <code>debug_trigger</code>, and <code>new_files</code> events.
+        </p>
+      </section>
+
+      <!-- Evaluation -->
+      <section id="eval">
+        <h2>Evaluation</h2>
+        <p>
+          We split evaluation into two suites, both run offline via
+          <code>evaluation/runner.py</code>.
+        </p>
+
+        <h3>Quantitative — trigger detection</h3>
+        <p>
+          Hand-authored YAML scenarios fed through the trigger evaluator; positive detection
+          rate, false-positive rate, and overall accuracy.
+        </p>
+
+        <h3>Qualitative — consistency and completion</h3>
+        <p>
+          The full Architect pipeline is run on the same scenario twice and compared: do both
+          produce valid, sandbox-executable skills (completion), do they share the same script
+          files and section headings (structural), and is the extracted parameter set the
+          same (parameter).
+        </p>
+
+        <table class="mini-table">
+          <thead><tr><th>Metric</th><th>Target</th><th class="num">Actual*</th></tr></thead>
+          <tbody>
+            <tr><td>Positive detection rate</td><td>≥ 90%</td><td class="num">92%</td></tr>
+            <tr><td>False-positive rate</td><td>&lt; 10%</td><td class="num">7%</td></tr>
+            <tr><td>Completion rate</td><td>≥ 95%</td><td class="num">96%</td></tr>
+            <tr><td>Structural consistency</td><td>≥ 80%</td><td class="num">84%</td></tr>
+            <tr><td>Parameter consistency</td><td>≥ 80%</td><td class="num">81%</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12.5px;color:var(--muted);font-family:var(--sans)">
+          * Figures from final evaluation run. The consistency suite matters more than raw
+          detection: a pipeline that triggers reliably but generates subtly different skills on
+          the same input is unusable.
+        </p>
+      </section>
+
+      <!-- Deploy -->
+      <section id="deploy">
+        <h2>Deployment</h2>
+        <p>Three moving parts: frontend, backend, and the Docker daemon the backend talks to.</p>
+        <dl class="def">
+          <dt>frontend</dt>
+          <dd>Next.js on Vercel. One env var: <code>NEXT_PUBLIC_BACKEND_URL</code>.</dd>
+          <dt>backend</dt>
+          <dd>EC2 behind DuckDNS with Let's Encrypt terminating TLS at 443. The host has Docker installed and <code>docker.sock</code> mounted into the backend container — a DinD-style setup.</dd>
+          <dt>cost</dt>
+          <dd>EC2 is the main variable cost (~$1/day on-demand). Gemini calls stayed inside the free tier on normal demo usage.</dd>
+        </dl>
+      </section>
+
+      <!-- Limits -->
+      <section id="limits">
+        <h2>Limitations and what we'd build next</h2>
+        <p>Being honest about gaps is part of the report.</p>
+        <ul>
+          <li><strong>File-based storage.</strong> First migration we'd do: skills + workers to Postgres, buffer to Redis, on-disk skill folders reduced to a derived artifact.</li>
+          <li><strong>No authentication.</strong> Backend trusts <code>user_id</code> from the form. The architecture is auth-ready; the layer itself is missing.</li>
+          <li><strong>No rate limiting.</strong> Gemini calls aren't budgeted per user.</li>
+          <li><strong>Docker-in-Docker on EC2.</strong> Works, not recommended for production. Natural answer is Fly Machines or Fargate with per-task isolation.</li>
+          <li><strong>Validation sandbox network.</strong> Currently default network; <code>--network none</code> broke skills that legitimately need DNS during dry-run. We live with the trade-off during the short validation window.</li>
+          <li><strong>Session-scoped files.</strong> By design, wiped when the session ends; we would add a per-file "persist=true" flag given an auth story.</li>
+        </ul>
+        <p>
+          <strong>If we had another semester:</strong> cross-session workflow detection
+          (user-level rolling buffer) and skill-to-skill composition (letting the Architect
+          generate skills that <em>call</em> existing skills, turning the library into a
+          compositional substrate).
+        </p>
+      </section>
+
+      <!-- Small -->
+      <section id="small">
+        <h2>Small things we sweated</h2>
+
+        <h3>Trust signals</h3>
+        <p>
+          Amber (not red) duplicate warnings on candidate cards — the system is <em>asking</em>,
+          not forbidding. Validation banners in the review modal with colour-coded severity.
+          Active-skill chips in the reply stream so the user always knows which skills ran.
+        </p>
+
+        <h3>Latency hiding</h3>
+        <p>
+          Non-blocking trigger (<code>done</code> before the trigger returns). Background
+          per-user image rebuilds. Lazy <code>_sync_session_skills</code> that no-ops when the
+          active set is unchanged.
+        </p>
+
+        <h3>Context affordances</h3>
+        <p>
+          Six category-coloured pills, fixed mapping. Humanised file sizes (<code>1.2 MB</code>,
+          not <code>1247389 B</code>). Eye-toggle inline preview for CSV and Markdown — one
+          click in the Files sidebar, no download round-trip, no leaving the chat. Three
+          example-prompt chips on the empty chat screen — the difference between "I don't
+          know what to ask" and "oh, like this."
+        </p>
+
+        <h3>Returning-user onboarding</h3>
+        <p>
+          The Welcome modal is <code>localStorage</code>-gated, so first-time users see a
+          three-bullet primer once and never again. Returning users who forget what the
+          product does don't have to clear their storage to find out — the About button in
+          the top bar re-opens an identical panel with a GitHub link. A small thing, but the
+          alternative (no recovery path for "what does this do again?") is worse than
+          having no onboarding at all.
+        </p>
+      </section>
+
+      <!-- Close calls -->
+      <section id="close">
+        <h2>Things we noticed before they bit us</h2>
+        <p>
+          Every project has decisions where the obvious first answer would have broken
+          something — not in a way tests catch, but in a way a user would eventually hit.
+          These are ours.
+        </p>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 01</span>
+          <h4>Preserving exact column casing in generated scripts</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Let the model generate scripts using natural-sounding column names like <code>row["Department"]</code>.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> User-supplied CSVs often have headers like <code>department</code> (lowercase). The script validates (syntax OK, <code>pandas</code> imports) but explodes on first real use — a silent runtime bomb.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> Explicit "preserve EXACT spelling, casing, and whitespace" instruction in <code>expand.md</code>, reinforced by treating attached-file content as canonical.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 02</span>
+          <h4>Argparse unrecognised-args retry</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Declare sandbox validation failed on the first non-zero exit.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> Gemini sometimes hallucinates an <code>--output</code> flag on scripts that print to stdout. The script is fine; the caller is wrong. Rejecting the skill would be unfair.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> On <code>exit 2</code> + <code>unrecognized arguments</code>, strip the offending flags and retry once. If the retry passes, log a warning but accept.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 03</span>
+          <h4>Snapshot-before-overwrite on every mutation</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Write the new <code>SKILL.md</code> and scripts directly, treating each update as idempotent.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> Evolution is the feature users are most likely to regret instantly. A natural-language refinement could destroy a working skill with no recovery path.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> Every update path snapshots the existing version under <code>versions/</code> before overwriting. Extra disk is immaterial; regret-recovery is not.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 04</span>
+          <h4>Read-only skills mount in the session sandbox</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Mount the skills directory read-write so the agent could, in theory, self-modify its skills mid-conversation.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> A single prompt injection or hallucination could rewrite a working skill to nonsense; the validation ladder is <em>upstream</em> of the agent.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> <code>.gemini/skills</code> is mounted <code>:ro</code>. Changes have to come back through the review modal.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 05</span>
+          <h4>Rate-limit-only retry, not blanket retry</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Wrap the trigger in a generic "retry on any failure" loop.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> The trigger fires on every assistant turn. A prompt-level bug would retry three times per turn, tripling quota usage while making no progress.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> Inspect the error string for <code>429</code>, <code>RESOURCE_EXHAUSTED</code>, or <code>503</code> before retrying. Genuine failures fail fast.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 06</span>
+          <h4>API key redaction in tool output streams</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Forward the Gemini CLI's stdout straight to the SSE stream.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> The CLI sometimes echoes its own invocation in verbose output, which can include <code>GEMINI_API_KEY</code>. Shipped to prod, it would have been a credential leak to every browser tab.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> Replace any occurrence of <code>GEMINI_API_KEY</code> in tool output with <code>[REDACTED_API_KEY]</code> before the event leaves the backend.</div>
+        </div>
+
+        <div class="close-call">
+          <span class="cc-label">Close call · 07</span>
+          <h4>Only crediting skills on successful tool invocations</h4>
+          <div class="cc-body"><span class="cc-label danger">what we almost did</span> Attribute a skill to every turn where the agent <em>tried</em> to invoke it.</div>
+          <div class="cc-body"><span class="cc-label">why it would have broken</span> A skill that errors out is arguably <em>less</em> used, not more. Counting failed attempts skews "most used" toward broken skills.</div>
+          <div class="cc-body"><span class="cc-label good">what we did instead</span> The tool-result handler checks output for error signatures (<code>Traceback</code>, <code>No such file</code>, <code>Permission denied</code>) and only credits the skill when none are present.</div>
+        </div>
+      </section>
+
+      <div class="end-rule">· · ·</div>
+
+      <p style="color:var(--muted);font-family:var(--sans);font-size:13.5px;text-align:center;margin:0 0 40px">
+        Code, prompts, and full evaluation set at
+        <a href="https://github.com/ykedwinlau-ai/CS5260-Project-AutoSkill">github.com/…/AutoSkill</a>.
+        Live demo at <a href="https://auto-skill.vercel.app">auto-skill.vercel.app</a>.
+      </p>
+
+    </article>
+  </div>
+
+  <footer>
+    <div>AutoSkill · CS5260 · National University of Singapore</div>
+    <div>Last updated April 2026</div>
+  </footer>
+</div>
+
+<!-- Tweaks -->
+<button class="tweaks-fab" id="tweaks-fab">✦</button>
+<div class="tweaks-panel" id="tweaks-panel">
+  <div class="tweaks-title">Tweaks</div>
+  <div class="tweak-group">
+    <div class="tweak-label">Theme</div>
+    <div class="tweak-row" id="tweak-theme">
+      <button class="tweak-chip active" data-val="light">Light</button>
+      <button class="tweak-chip" data-val="dark">Dark</button>
+    </div>
+  </div>
+  <div class="tweak-group">
+    <div class="tweak-label">Accent</div>
+    <div class="tweak-row" id="tweak-accent">
+      <button class="tweak-swatch active" style="background:oklch(0.48 0.15 270)" data-val="270"></button>
+      <button class="tweak-swatch" style="background:oklch(0.55 0.15 25)" data-val="25"></button>
+      <button class="tweak-swatch" style="background:oklch(0.52 0.15 155)" data-val="155"></button>
+      <button class="tweak-swatch" style="background:oklch(0.5 0.15 60)" data-val="60"></button>
+      <button class="tweak-swatch" style="background:oklch(0.4 0.02 270)" data-val="mono"></button>
+    </div>
+  </div>
+  <div class="tweak-group">
+    <div class="tweak-label">Diagram style</div>
+    <div class="tweak-row" id="tweak-diagram">
+      <button class="tweak-chip active" data-val="schematic">Schematic</button>
+      <button class="tweak-chip" data-val="hand">Sketchy</button>
+    </div>
+  </div>
+  <div class="tweak-group">
+    <div class="tweak-label">Hero</div>
+    <div class="tweak-row" id="tweak-hero">
+      <button class="tweak-chip active" data-val="editorial">Editorial</button>
+      <button class="tweak-chip" data-val="compact">Compact</button>
+    </div>
+  </div>
+</div>
+
+<!-- React -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="PipelineDiagram.jsx"></script>
+<script type="text/babel" src="ArchitectureDiagram.jsx"></script>
+<script type="text/babel" src="Interactives.jsx"></script>
+
+<script type="text/babel">
+  // Mount React components
+  const diagramVariant = { current: "schematic" };
+
+  function remountPipeline() {
+    const root = document.getElementById('pipeline-mount');
+    if (root._root) root._root.unmount();
+    root._root = ReactDOM.createRoot(root);
+    root._root.render(<PipelineDiagram variant={diagramVariant.current}/>);
+  }
+  remountPipeline();
+
+  ReactDOM.createRoot(document.getElementById('arch-mount')).render(<ArchitectureDiagram/>);
+  ReactDOM.createRoot(document.getElementById('chat-mount')).render(<ChatMock/>);
+  ReactDOM.createRoot(document.getElementById('stepper-mount')).render(<ValidationStepper/>);
+  ReactDOM.createRoot(document.getElementById('ba-mount')).render(<BeforeAfter/>);
+
+  // SKILL.md code block
+  ReactDOM.createRoot(document.getElementById('codeblock-mount-skillmd')).render(
+    <CodeBlock filename="SKILL.md">
+      {`<span class="tok-com">---</span>
+<span class="tok-prop">name</span>: csv_column_summary
+<span class="tok-prop">description</span>: Summarise a single column of a CSV — count, mean, min, max, null count.
+<span class="tok-prop">arguments</span>:
+  - <span class="tok-prop">name</span>: input_file
+    <span class="tok-prop">type</span>: string
+    <span class="tok-prop">description</span>: Path to the CSV file.
+  - <span class="tok-prop">name</span>: column
+    <span class="tok-prop">type</span>: string
+    <span class="tok-prop">description</span>: Name of the column to summarise.
+<span class="tok-com">---</span>
+
+When invoked, run <span class="tok-str">\`scripts/summarise.py\`</span> with the provided arguments and
+return the resulting summary table to the user.`}
+    </CodeBlock>
+  );
+
+  // Mount layout (docker)
+  ReactDOM.createRoot(document.getElementById('mount-code')).render(
+    <CodeBlock filename="docker run — autoskill-session-{id}" collapsedByDefault={true}>
+      {`<span class="tok-kw">docker run</span> -d \\
+  --name autoskill-session-<span class="tok-num">\${session_id}</span> \\
+  -v <span class="tok-str">&lt;workspace&gt;</span>:/app                                  <span class="tok-com"># read-write: agent cwd</span>
+  -v <span class="tok-str">&lt;gemini-dir&gt;</span>/skills:/app/.gemini/skills:<span class="tok-kw">ro</span>       <span class="tok-com"># read-only: source of truth</span>
+  -v <span class="tok-str">&lt;gemini-dir&gt;</span>/system.md:/app/.gemini/system.md:<span class="tok-kw">ro</span>
+  -v <span class="tok-str">&lt;gemini-dir&gt;</span>/settings.json:/app/.gemini/settings.json:<span class="tok-kw">ro</span>
+  -v <span class="tok-str">&lt;gemini-dir&gt;</span>/tmp:/root/.gemini/tmp                   <span class="tok-com"># writable: CLI chat cache</span>
+  --label <span class="tok-str">autoskill.user=&lt;user_id&gt;</span> \\
+  autoskill-sandbox \\
+  tail -f /dev/null`}
+    </CodeBlock>
+  );
+
+  // Tweaks
+  const fab = document.getElementById('tweaks-fab');
+  const panel = document.getElementById('tweaks-panel');
+  const root = document.documentElement;
+
+  let edits = {};
+  function applyEdits(e) {
+    edits = { ...edits, ...e };
+    if (edits.theme) root.setAttribute('data-theme', edits.theme);
+    if (edits.accent) {
+      if (edits.accent === 'mono') {
+        root.style.setProperty('--accent', 'oklch(0.4 0.02 270)');
+        root.style.setProperty('--accent-soft', 'oklch(0.92 0.01 270)');
+      } else {
+        root.style.setProperty('--accent', `oklch(0.48 0.15 ${edits.accent})`);
+        root.style.setProperty('--accent-soft', `oklch(0.92 0.05 ${edits.accent})`);
+      }
+    }
+    if (edits.diagram) {
+      diagramVariant.current = edits.diagram;
+      remountPipeline();
+    }
+    if (edits.hero) {
+      const hero = document.querySelector('.hero');
+      hero.style.padding = edits.hero === 'compact' ? '48px 0 24px' : '80px 0 40px';
+    }
+    try { window.parent.postMessage({type:'__edit_mode_set_keys', edits}, '*'); } catch(e){}
+  }
+
+  function wireGroup(groupId, key) {
+    document.querySelectorAll(`#${groupId} .tweak-chip, #${groupId} .tweak-swatch`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll(`#${groupId} .tweak-chip, #${groupId} .tweak-swatch`).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyEdits({[key]: btn.dataset.val});
+      });
+    });
+  }
+  wireGroup('tweak-theme', 'theme');
+  wireGroup('tweak-accent', 'accent');
+  wireGroup('tweak-diagram', 'diagram');
+  wireGroup('tweak-hero', 'hero');
+
+  fab.addEventListener('click', () => panel.classList.toggle('open'));
+
+  // Edit-mode protocol
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "theme": "light",
+    "accent": "mono",
+    "diagram": "schematic",
+    "hero": "compact"
+  }/*EDITMODE-END*/;
+  applyEdits(TWEAK_DEFAULTS);
+
+  // Print mode: force light, schematic diagrams, compact hero
+  applyEdits({ theme: 'light', accent: '60', diagram: 'schematic', hero: 'compact' });
+
+  window.addEventListener('message', (e) => {
+    if (!e.data || !e.data.type) return;
+    if (e.data.type === '__activate_edit_mode') fab.classList.add('visible');
+    if (e.data.type === '__deactivate_edit_mode') {
+      fab.classList.remove('visible');
+      panel.classList.remove('open');
+    }
+  });
+  try { window.parent.postMessage({type:'__edit_mode_available'}, '*'); } catch(e){}
+
+  // TOC scrollspy
+  const links = document.querySelectorAll('#toc-list a');
+  const sections = [...links].map(a => document.querySelector(a.getAttribute('href')));
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY + 120;
+    let active = 0;
+    sections.forEach((s, i) => { if (s && s.offsetTop <= y) active = i; });
+    links.forEach((l, i) => {
+      l.parentElement.classList.toggle('active', i === active);
+    });
+  }, { passive: true });
+</script>
+
+<!-- Auto-print: wait for fonts, diagrams, and GIFs to settle -->
+<script type="text/babel">
+  (async () => {
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch(e){}
+    }
+    const waitForMount = (id) => new Promise(res => {
+      const start = Date.now();
+      const check = () => {
+        const el = document.getElementById(id);
+        if (el && el.childElementCount > 0) return res();
+        if (Date.now() - start > 5000) return res();
+        requestAnimationFrame(check);
+      };
+      check();
+    });
+    await Promise.all([
+      waitForMount('arch-mount'),
+      waitForMount('stepper-mount'),
+    ]);
+    // Wait for GIFs to fetch (first frame is enough for layout)
+    const imgs = [...document.querySelectorAll('.demo-frame img')];
+    await Promise.all(imgs.map(img => img.complete ? null : new Promise(r => {
+      img.onload = img.onerror = r;
+      setTimeout(r, 3000);
+    })));
+    await new Promise(r => setTimeout(r, 600));
+    window.print();
+  })();
+</script>
+
+</body>
+</html>
